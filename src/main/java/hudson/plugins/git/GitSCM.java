@@ -712,6 +712,7 @@ public class GitSCM extends GitSCMBackwardCompatibility {
                         for (RefSpec spec : refSpecs) {
                             if (spec.matchSource(head)) {
                                 match = true;
+                                listener.getLogger().println("Matched RefSpec: " + spec + " head: " + head);
                                 break;
                             }
                         }
@@ -728,6 +729,7 @@ public class GitSCM extends GitSCMBackwardCompatibility {
 
                             // first, check the a canonical git reference is configured
                             if (!branchSpec.matches(head, environment)) {
+                                listener.getLogger().println("branchSpec " + branchSpec + " does not match name " + name + " on environment " + environment);
 
                                 // convert head `refs/(heads|tags|whatever)/branch` into shortcut notation `remote/branch`
                                 String name = head;
@@ -735,7 +737,10 @@ public class GitSCM extends GitSCMBackwardCompatibility {
                                 if (matcher.matches()) name = remote + head.substring(matcher.group(1).length());
                                 else name = remote + "/" + head;
 
-                                if (!branchSpec.matches(name, environment)) continue;
+                                if (!branchSpec.matches(name, environment)) {
+                                    listener.getLogger().println("branchSpec " + branchSpec + " does not match converted name " + name + " on environment " + environment);
+                                    continue;
+                                }
                             }
 
                             final ObjectId sha1 = entry.getValue();
