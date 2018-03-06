@@ -6,51 +6,31 @@ import com.cloudbees.plugins.credentials.CredentialsProvider;
 import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
 import com.google.common.collect.Iterables;
-
 import edu.umd.cs.findbugs.annotations.CheckForNull;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-
-import hudson.AbortException;
-import hudson.EnvVars;
-import hudson.Extension;
-import hudson.FilePath;
-import hudson.Launcher;
+import hudson.*;
 import hudson.init.Initializer;
 import hudson.matrix.MatrixBuild;
 import hudson.matrix.MatrixRun;
-import hudson.model.AbstractBuild;
-import hudson.model.AbstractProject;
+import hudson.model.*;
 import hudson.model.Descriptor.FormException;
-import hudson.model.Items;
-import hudson.model.Job;
-import hudson.model.Node;
 import hudson.model.Queue;
-import hudson.model.Run;
-import hudson.model.Saveable;
-import hudson.model.TaskListener;
 import hudson.model.queue.Tasks;
+import hudson.plugins.git.browser.BitbucketWeb;
+import hudson.plugins.git.browser.GitLab;
 import hudson.plugins.git.browser.GitRepositoryBrowser;
+import hudson.plugins.git.browser.GithubWeb;
 import hudson.plugins.git.extensions.GitClientConflictException;
 import hudson.plugins.git.extensions.GitClientType;
 import hudson.plugins.git.extensions.GitSCMExtension;
 import hudson.plugins.git.extensions.GitSCMExtensionDescriptor;
-import hudson.plugins.git.extensions.impl.AuthorInChangelog;
-import hudson.plugins.git.extensions.impl.BuildChooserSetting;
-import hudson.plugins.git.extensions.impl.ChangelogToBranch;
-import hudson.plugins.git.extensions.impl.PathRestriction;
-import hudson.plugins.git.extensions.impl.LocalBranch;
-import hudson.plugins.git.extensions.impl.PreBuildMerge;
+import hudson.plugins.git.extensions.impl.*;
 import hudson.plugins.git.opt.PreBuildMergeOptions;
 import hudson.plugins.git.util.Build;
 import hudson.plugins.git.util.*;
 import hudson.remoting.Channel;
-import hudson.scm.AbstractScmTagAction;
-import hudson.scm.ChangeLogParser;
-import hudson.scm.PollingResult;
-import hudson.scm.RepositoryBrowser;
-import hudson.scm.SCMDescriptor;
-import hudson.scm.SCMRevisionState;
+import hudson.scm.*;
 import hudson.security.ACL;
 import hudson.tasks.Builder;
 import hudson.tasks.Publisher;
@@ -58,61 +38,36 @@ import hudson.triggers.SCMTrigger;
 import hudson.util.DescribableList;
 import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
+import hudson.util.LogTaskListener;
 import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
-
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.transport.URIish;
-import org.jenkinsci.plugins.gitclient.ChangelogCommand;
-import org.jenkinsci.plugins.gitclient.CheckoutCommand;
-import org.jenkinsci.plugins.gitclient.CloneCommand;
-import org.jenkinsci.plugins.gitclient.FetchCommand;
-import org.jenkinsci.plugins.gitclient.Git;
-import org.jenkinsci.plugins.gitclient.GitClient;
-import org.jenkinsci.plugins.gitclient.JGitTool;
+import org.jenkinsci.plugins.gitclient.*;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.Stapler;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.export.Exported;
 
 import javax.servlet.ServletException;
-
-import java.io.File;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.PrintStream;
-import java.io.Serializable;
-import java.io.Writer;
+import java.io.*;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.Map.Entry;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static hudson.init.InitMilestone.JOB_LOADED;
 import static hudson.init.InitMilestone.PLUGINS_STARTED;
-import hudson.plugins.git.browser.BitbucketWeb;
-import hudson.plugins.git.browser.GitLab;
-import hudson.plugins.git.browser.GithubWeb;
-import static hudson.scm.PollingResult.*;
-import hudson.Util;
-import hudson.util.LogTaskListener;
-import java.util.Map.Entry;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
+import static hudson.scm.PollingResult.BUILD_NOW;
+import static hudson.scm.PollingResult.NO_CHANGES;
 import static org.apache.commons.collections.CollectionUtils.isEmpty;
 import static org.apache.commons.lang.StringUtils.isBlank;
 
@@ -662,7 +617,7 @@ public class GitSCM extends GitSCMBackwardCompatibility {
 
     private PollingResult compareRemoteRevisionWithImpl(Job<?, ?> project, Launcher launcher, FilePath workspace, final @NonNull TaskListener listener) throws IOException, InterruptedException {
         // Poll for changes. Are there any unbuilt revisions that Hudson ought to build ?
-
+        listener.getLogger().println("LOG project, launcher, workspace and listener: " + project + " " + launcher + " " + workspace + " " + listener);
         listener.getLogger().println("Using strategy: " + getBuildChooser().getDisplayName());
 
         final Run lastBuild = project.getLastBuild();
@@ -690,6 +645,8 @@ public class GitSCM extends GitSCMBackwardCompatibility {
             for (RemoteConfig remoteConfig : getParamExpandedRepos(lastBuild, listener)) {
                 String remote = remoteConfig.getName();
                 List<RefSpec> refSpecs = getRefSpecs(remoteConfig, environment);
+                // some log of refSpecs
+                listener.getLogger().println("LOG: refSpecs:" + refSpecs);
 
                 for (URIish urIish : remoteConfig.getURIs()) {
                     String gitRepo = urIish.toString();
@@ -702,10 +659,14 @@ public class GitSCM extends GitSCMBackwardCompatibility {
                     listener.getLogger().println("Found "+ heads.size() +" remote heads on " + urIish);
 
                     Iterator<Entry<String, ObjectId>> it = heads.entrySet().iterator();
+                    listener.getLogger().println("LOG it: " + it);
                     while (it.hasNext()) {
                         String head = it.next().getKey();
+                        listener.getLogger().println("LOG head: " + head );
                         boolean match = false;
                         for (RefSpec spec : refSpecs) {
+                            listener.getLogger().println("LOG this is spce from RefSpec list:" + spec);
+                            listener.getLogger().println("LOG spec.match? :" + spec.matchSource(head));
                             if (spec.matchSource(head)) {
                                 match = true;
                                 break;
@@ -717,12 +678,15 @@ public class GitSCM extends GitSCMBackwardCompatibility {
                         }
                     }
 
-                    for (BranchSpec branchSpec : getBranches()) {
+                    listener.getLogger().println("LOG getBranches: " + getBranches());
+                     for (BranchSpec branchSpec : getBranches()) {
                         for (Entry<String, ObjectId> entry : heads.entrySet()) {
                             final String head = entry.getKey();
+                            listener.getLogger().println("LOG each head: " + head);
                             // head is "refs/(heads|tags|whatever)/branchName
 
                             // first, check the a canonical git reference is configured
+                            listener.getLogger().println("LOG Is the canonical git reference configured? :" + !branchSpec.matches(head, environment));
                             if (!branchSpec.matches(head, environment)) {
 
                                 // convert head `refs/(heads|tags|whatever)/branch` into shortcut notation `remote/branch`
@@ -730,7 +694,7 @@ public class GitSCM extends GitSCMBackwardCompatibility {
                                 Matcher matcher = GIT_REF.matcher(head);
                                 if (matcher.matches()) name = remote + head.substring(matcher.group(1).length());
                                 else name = remote + "/" + head;
-
+                                listener.getLogger().println("LOG branch name: " + name);
                                 if (!branchSpec.matches(name, environment)) continue;
                             }
 
@@ -747,6 +711,7 @@ public class GitSCM extends GitSCMBackwardCompatibility {
                     }
                 }
             }
+            listener.getLogger().println("LOG welp.. nothig to do.. NO_CHANGES");
             return NO_CHANGES;
         }
 
