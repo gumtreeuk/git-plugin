@@ -729,7 +729,7 @@ public class GitSCM extends GitSCMBackwardCompatibility {
 
                             // first, check the a canonical git reference is configured
                             if (!branchSpec.matches(head, environment)) {
-                                listener.getLogger().println("branchSpec " + branchSpec + " does not match name " + name + " on environment " + environment);
+                                listener.getLogger().println("branchSpec " + branchSpec + " does not match head " + head + " on environment " + environment);
 
                                 // convert head `refs/(heads|tags|whatever)/branch` into shortcut notation `remote/branch`
                                 String name = head;
