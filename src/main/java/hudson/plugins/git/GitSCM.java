@@ -690,6 +690,9 @@ public class GitSCM extends GitSCMBackwardCompatibility {
             for (RemoteConfig remoteConfig : getParamExpandedRepos(lastBuild, listener)) {
                 String remote = remoteConfig.getName();
                 List<RefSpec> refSpecs = getRefSpecs(remoteConfig, environment);
+                for(RefSpec refSpec : refSpecs) {
+                    listener.getLogger().println("RefSpec: " + refSpec);
+                }
 
                 for (URIish urIish : remoteConfig.getURIs()) {
                     String gitRepo = urIish.toString();
@@ -704,6 +707,7 @@ public class GitSCM extends GitSCMBackwardCompatibility {
                     Iterator<Entry<String, ObjectId>> it = heads.entrySet().iterator();
                     while (it.hasNext()) {
                         String head = it.next().getKey();
+                        listener.getLogger().println("Processing head: " + head);
                         boolean match = false;
                         for (RefSpec spec : refSpecs) {
                             if (spec.matchSource(head)) {
